@@ -5,9 +5,9 @@ import requests
 from web3 import Web3
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
-from telegram import Update, Bot, InputMediaAnimation
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 import os
 
@@ -127,7 +127,7 @@ def home():
     return "Bot ist online!"
 
 def run_web():
-    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))  
+    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
 def keep_alive():
     t = Thread(target=run_web)
@@ -146,21 +146,23 @@ async def main():
 
     asyncio.create_task(monitor_presale())
 
-    # Webhook Setup
+    # Webhook setzen
     WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
     await app.bot.delete_webhook(drop_pending_updates=True)
     await app.bot.set_webhook(url=WEBHOOK_URL)
 
     print("✅ Bot läuft über Webhook.")
 
-    # Starte Flask-Webhook-Server
-    from telegram.ext import Application
-    from telegram.ext.webhookhandler import WebhookHandler
+    # Flask Route zum Empfangen von Telegram Updates
+    @app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
+    def telegram_webhook():
+        update = Update.de_json(request.get_json(force=True), bot)
+        asyncio.create_task(app.update_queue.put(update))
+        return 'OK'
 
-    async def telegram_webhook():
-        return await app.webhook_handler(request)
-
-    app_web.add_url_rule(f"/{BOT_TOKEN}", view_func=lambda: asyncio.run(telegram_webhook()), methods=["POST"])
+    # Damit das Programm nicht sofort endet und die Tasks weiterlaufen
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == '__main__':
     asyncio.run(main())
