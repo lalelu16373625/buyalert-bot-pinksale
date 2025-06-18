@@ -146,12 +146,21 @@ async def main():
 
     asyncio.create_task(monitor_presale())
 
-    print("✅ Bot läuft und hört auf Commands.")
-    await app.run_polling()
+    # Webhook Setup
+    WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    await app.bot.set_webhook(url=WEBHOOK_URL)
 
-import nest_asyncio
-nest_asyncio.apply()
+    print("✅ Bot läuft über Webhook.")
+
+    # Starte Flask-Webhook-Server
+    from telegram.ext import Application
+    from telegram.ext.webhookhandler import WebhookHandler
+
+    async def telegram_webhook():
+        return await app.webhook_handler(request)
+
+    app_web.add_url_rule(f"/{BOT_TOKEN}", view_func=lambda: asyncio.run(telegram_webhook()), methods=["POST"])
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())
