@@ -154,7 +154,7 @@ def keep_alive():
 
 
 # === BOT STARTEN ===
-if __name__ == '__main__':
+async def main():
     keep_alive()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -163,13 +163,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("setratio", set_ratio))
     app.add_handler(CommandHandler("uptime", uptime))
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(monitor_presale())
-    loop.create_task(app.run_polling())
+    asyncio.create_task(monitor_presale())
 
     print("✅ Bot läuft und hört auf Commands.")
+    await app.run_polling()
 
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        print("Bot gestoppt")
+if __name__ == '__main__':
+    asyncio.run(main())
