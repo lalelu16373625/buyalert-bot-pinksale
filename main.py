@@ -34,7 +34,6 @@ settings = {
 # === TELEGRAM SETUP ===
 bot = Bot(BOT_TOKEN)
 
-
 # === KOMMANDOS ===
 async def set_gif(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
@@ -43,61 +42,51 @@ async def set_gif(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Bitte gib eine gültige GIF-URL an.")
 
-
 async def set_emoji(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         settings["emoji"] = context.args[0]
-        await update.message.reply_text(f"✅ Emoji gesetzt: {settings['emoji']}"
-                                        )
+        await update.message.reply_text(f"✅ Emoji gesetzt: {settings['emoji']}")
     else:
         await update.message.reply_text("❌ Bitte gib ein Emoji an.")
-
 
 async def set_ratio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         try:
             ratio = Decimal(context.args[0])
             settings["ratio"] = ratio
-            await update.message.reply_text(
-                f"✅ Ratio gesetzt: 1 Emoji pro ${ratio}")
+            await update.message.reply_text(f"✅ Ratio gesetzt: 1 Emoji pro ${ratio}")
         except:
             await update.message.reply_text("❌ Ungültige Zahl für Ratio.")
     else:
         await update.message.reply_text("❌ Bitte gib eine Zahl an.")
 
-
 async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Ich bin online und arbeite!")
-
 
 # === HELFER ===
 def get_eth_price():
     try:
-        res = requests.get(
-            'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
-        )
+        res = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
         return Decimal(res.json()['ethereum']['usd'])
     except:
         return Decimal('3500')
 
-
 def create_emoji_bar(amount_usd: Decimal):
-    count = int((amount_usd /
-                 settings['ratio']).to_integral_value(rounding=ROUND_DOWN))
+    count = int((amount_usd / settings['ratio']).to_integral_value(rounding=ROUND_DOWN))
     return settings['emoji'] * count
-
 
 def format_message(to_addr, value_eth, usd, total_eth, total_usd):
     percent = (total_eth / HARDCAP_ETH * 100).quantize(Decimal('0.01'))
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     emoji_bar = create_emoji_bar(usd)
 
-    return (f"🚀 <b>New Presale Buy!</b>\n"
-            f"💰 <b>Amount:</b> {value_eth:.4f} ETH (${usd:.2f}) {emoji_bar}\n"
-            f"🕒 <b>Time:</b> {timestamp}\n\n"
-            f"📊 <b>Total Raised:</b> {total_eth:.4f} ETH (${total_usd:.2f})\n"
-            f"🎯 <b>Progress:</b> {percent}%")
-
+    return (
+        f"🚀 <b>New Presale Buy!</b>\n"
+        f"💰 <b>Amount:</b> {value_eth:.4f} ETH (${usd:.2f}) {emoji_bar}\n"
+        f"🕒 <b>Time:</b> {timestamp}\n\n"
+        f"📊 <b>Total Raised:</b> {total_eth:.4f} ETH (${total_usd:.2f})\n"
+        f"🎯 <b>Progress:</b> {percent}%"
+    )
 
 async def send_alert(to_addr, value_eth, usd):
     global total_eth, total_usd
@@ -106,13 +95,9 @@ async def send_alert(to_addr, value_eth, usd):
     msg = format_message(to_addr, value_eth, usd, total_eth, total_usd)
 
     if settings['gif_url']:
-        await bot.send_animation(chat_id=CHAT_ID,
-                                 animation=settings['gif_url'],
-                                 caption=msg,
-                                 parse_mode='HTML')
+        await bot.send_animation(chat_id=CHAT_ID, animation=settings['gif_url'], caption=msg, parse_mode='HTML')
     else:
         await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
-
 
 # === PRESALE MONITOR ===
 async def monitor_presale():
@@ -133,25 +118,20 @@ async def monitor_presale():
 
         prev_balance = new_balance
 
-
 # === KEEP ALIVE ===
 app_web = Flask('')
-
 
 @app_web.route('/')
 def home():
     return "Bot ist online!"
 
-
 def run_web():
-    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
-
+    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))  
 
 def keep_alive():
     t = Thread(target=run_web)
     t.daemon = True
     t.start()
-
 
 # === BOT STARTEN ===
 async def main():
