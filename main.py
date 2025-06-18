@@ -34,6 +34,7 @@ settings = {
 
 # === TELEGRAM SETUP ===
 bot = Bot(BOT_TOKEN)
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # === KOMMANDOS ===
 async def set_gif(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,12 +120,18 @@ async def monitor_presale():
 
         prev_balance = new_balance
 
-# === KEEP ALIVE ===
+# === FLASK SETUP ===
 app_web = Flask('')
 
 @app_web.route('/')
 def home():
     return "Bot ist online!"
+
+@app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
+def telegram_webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    asyncio.create_task(app.update_queue.put(update))
+    return 'OK'
 
 def run_web():
     app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
@@ -138,29 +145,23 @@ def keep_alive():
 async def main():
     keep_alive()
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Telegram Commands registrieren
     app.add_handler(CommandHandler("setgif", set_gif))
     app.add_handler(CommandHandler("setemoji", set_emoji))
     app.add_handler(CommandHandler("setratio", set_ratio))
     app.add_handler(CommandHandler("uptime", uptime))
 
+    # Presale Monitor starten
     asyncio.create_task(monitor_presale())
 
     # Webhook setzen
     WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
-    await app.bot.delete_webhook(drop_pending_updates=True)
-    await app.bot.set_webhook(url=WEBHOOK_URL)
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_webhook(url=WEBHOOK_URL)
 
     print("✅ Bot läuft über Webhook.")
 
-    # Flask Route zum Empfangen von Telegram Updates
-    @app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
-    def telegram_webhook():
-        update = Update.de_json(request.get_json(force=True), bot)
-        asyncio.create_task(app.update_queue.put(update))
-        return 'OK'
-
-    # Damit das Programm nicht sofort endet und die Tasks weiterlaufen
+    # Damit das Programm läuft und Tasks weiterlaufen
     while True:
         await asyncio.sleep(3600)
 
