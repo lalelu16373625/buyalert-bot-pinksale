@@ -155,7 +155,7 @@ async def main():
     )
 
 if __name__ == '__main__':
-    asyncio.run(main())'
+    asyncio.run(main())
 PRESALE_CA = '0xC1D459AD4A5D2A6a9557640b6910941718F4fC59'
 SOFTCAP_ETH = Decimal('8.6')
 HARDCAP_ETH = Decimal('34.4')
