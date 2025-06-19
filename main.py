@@ -265,9 +265,7 @@ async def monitor_presale(application):
 # === MAIN ===
 import asyncio
 
-if __name__ == '__main__':
-    from telegram.ext import ApplicationBuilder
-
+async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # Telegram-Befehle registrieren
@@ -277,15 +275,15 @@ if __name__ == '__main__':
     application.add_handler(CommandHandler("uptime", uptime))
 
     # Monitor-Task starten
-    async def start_monitor():
-        await monitor_presale(application)
-
-    asyncio.create_task(start_monitor())
+    asyncio.create_task(monitor_presale(application))
 
     # Webhook starten
-    application.run_webhook(
+    await application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
         webhook_url=WEBHOOK_URL,
         drop_pending_updates=True,
     )
+
+if __name__ == '__main__':
+    asyncio.run(main())
