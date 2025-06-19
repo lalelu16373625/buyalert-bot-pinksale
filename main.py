@@ -285,5 +285,30 @@ async def main():
         drop_pending_updates=True,
     )
 
-if __name__ == '__main__':
-    asyncio.run(main())
+import asyncio
+
+async def main():
+    # Deine App initialisieren
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Commands registrieren
+    application.add_handler(CommandHandler("setgif", set_gif))
+    application.add_handler(CommandHandler("setemoji", set_emoji))
+    application.add_handler(CommandHandler("setratio", set_ratio))
+    application.add_handler(CommandHandler("uptime", uptime))
+
+    # Monitoring starten
+    asyncio.create_task(monitor_presale(application))
+
+    # Webhook starten und warten
+    await application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        webhook_url=WEBHOOK_URL,
+        drop_pending_updates=True,
+    )
+
+# Statt asyncio.run(main()), mach:
+loop = asyncio.get_event_loop()
+loop.create_task(main())
+loop.run_forever()
