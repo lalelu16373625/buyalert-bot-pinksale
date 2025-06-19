@@ -159,7 +159,7 @@ if __name__ == '__main__':
     application.job_queue.run_repeating(lambda _: asyncio.create_task(monitor_presale()), interval=10, first=1)
 
     # Webhook URL (anpassen, auf deine Render-URL)
-    WEBHOOK_URL = https://buyalert-bot-pinksale.onrender.com/7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew 
+    WEBHOOK_URL = 'https://buyalert-bot-pinksale.onrender.com/7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew' 
 
     # Bot starten und Webhook setzen
     asyncio.run(application.run_webhook(
