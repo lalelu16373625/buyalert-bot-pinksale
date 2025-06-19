@@ -117,7 +117,7 @@ async def monitor_presale(application):
             print(f"Fehler beim Monitoring: {e}")
 
 # === MAIN ===
-async def run():
+async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # Telegram Commands registrieren
@@ -126,16 +126,29 @@ async def run():
     application.add_handler(CommandHandler("setratio", set_ratio))
     application.add_handler(CommandHandler("uptime", uptime))
 
-    # Presale Monitor als parallele Task starten
-    asyncio.create_task(monitor_presale(application))
+    # Bot initialisieren & starten
+    await application.initialize()
+    await application.start()
 
-    # Webhook starten und blockieren
-    await application.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8080)),
-        webhook_url=WEBHOOK_URL,
-        drop_pending_updates=True,
-    )
+    # Telegram Webhook setzen
+    await application.bot.set_webhook(url=WEBHOOK_URL)
+
+    # Hintergrund-Task starten
+    monitor_task = asyncio.create_task(monitor_presale(application))
+
+    print("Bot läuft...")
+
+    try:
+        # Programm läuft, hier hält es sich am Leben
+        while True:
+            await asyncio.sleep(3600)
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot wird beendet...")
+
+    # Aufräumen bei Exit
+    monitor_task.cancel()
+    await application.stop()
+    await application.shutdown()
 
 if __name__ == '__main__':
-    asyncio.run(run())
+    asyncio.run(main())
