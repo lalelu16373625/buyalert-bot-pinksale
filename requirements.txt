@@ -1,4 +1,4 @@
-python-telegram-bot==20.3
+python-telegram-bot[webhooks]==20.8
 web3==6.18.0
 requests
 flask
