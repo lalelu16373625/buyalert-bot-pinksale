@@ -1,3 +1,4 @@
+from aiohttp import web
 import asyncio
 import requests
 from web3 import Web3
@@ -129,26 +130,31 @@ async def main():
     # Bot initialisieren & starten
     await application.initialize()
     await application.start()
-
-    # Telegram Webhook setzen
     await application.bot.set_webhook(url=WEBHOOK_URL)
 
-    # Hintergrund-Task starten
-    monitor_task = asyncio.create_task(monitor_presale(application))
+    # Presale Monitor starten
+    asyncio.create_task(monitor_presale(application))
 
-    print("Bot läuft...")
+    # Webserver für Telegram Webhook starten
+    async def handle(request):
+        data = await request.json()
+        update = Update.de_json(data, application.bot)
+        await application.process_update(update)
+        return web.Response()
 
-    try:
-        # Programm läuft, hier hält es sich am Leben
-        while True:
-            await asyncio.sleep(3600)
-    except (KeyboardInterrupt, SystemExit):
-        print("Bot wird beendet...")
+    app = web.Application()
+    app.router.add_post(f'/{BOT_TOKEN}', handle)
 
-    # Aufräumen bei Exit
-    monitor_task.cancel()
-    await application.stop()
-    await application.shutdown()
+    port = int(os.environ.get("PORT", 8080))
+    print(f"✅ Webhook läuft auf Port {port}")
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+    # Am Leben halten
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == '__main__':
     asyncio.run(main())
