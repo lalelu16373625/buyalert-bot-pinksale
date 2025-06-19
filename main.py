@@ -12,7 +12,7 @@ import os
 
 # === KONFIGURATION ===
 BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
-CHAT_ID = 'import asyncio
+CHAT_ID = '-1002317784481'
 import json
 import requests
 from web3 import Web3
