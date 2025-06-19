@@ -12,8 +12,8 @@ from telegram.ext import (
 from web3 import Web3
 
 # === KONFIGURATION ===
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
+CHAT_ID = '-1002317784481'
 PRESALE_CA = '0xC1D459AD4A5D2A6a9557640b6910941718F4fC59'
 SOFTCAP_ETH = Decimal('8.6')
 HARDCAP_ETH = Decimal('34.4')
