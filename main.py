@@ -7,9 +7,13 @@ from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from flask import Flask, request
+from flask import Flask
 from threading import Thread
 import os
+import logging
+
+# === LOGGING AKTIVIEREN ===
+logging.basicConfig(level=logging.INFO)
 
 # === KONFIGURATION ===
 BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
@@ -120,18 +124,12 @@ async def monitor_presale():
 
         prev_balance = new_balance
 
-# === FLASK SETUP ===
+# === FLASK SETUP (nur für Ping/Status) ===
 app_web = Flask('')
 
 @app_web.route('/')
 def home():
     return "Bot ist online!"
-
-@app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
-def telegram_webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    asyncio.create_task(app.update_queue.put(update))
-    return 'OK'
 
 def run_web():
     app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
@@ -154,16 +152,20 @@ async def main():
     # Presale Monitor starten
     asyncio.create_task(monitor_presale())
 
-    # Webhook setzen
+    # Webhook aktivieren
     WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(url=WEBHOOK_URL)
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    await app.bot.set_webhook(url=WEBHOOK_URL)
 
     print("✅ Bot läuft über Webhook.")
 
-    # Damit das Programm läuft und Tasks weiterlaufen
-    while True:
-        await asyncio.sleep(3600)
+    # Telegram Webhook Server starten
+    await app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080)),
+        webhook_url=WEBHOOK_URL
+    )
 
 if __name__ == '__main__':
+    nest_asyncio.apply()
     asyncio.run(main())
