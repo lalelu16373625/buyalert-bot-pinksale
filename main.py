@@ -1,19 +1,20 @@
 import asyncio
-import nest_asyncio
-import os
-from datetime import datetime
-from decimal import Decimal, ROUND_DOWN
-
+import json
 import requests
-from telegram import Update, Bot
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, ContextTypes
-)
+from decimal import Decimal, ROUND_DOWN
+from datetime import datetime
+from threading import Thread
+import os
+
+from flask import Flask, request
+
 from web3 import Web3
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # === KONFIGURATION ===
 BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
-CHAT_ID = '-1002317784481'
+CHAT_ID = '-1002317784481' 
 PRESALE_CA = '0xC1D459AD4A5D2A6a9557640b6910941718F4fC59'
 SOFTCAP_ETH = Decimal('8.6')
 HARDCAP_ETH = Decimal('34.4')
@@ -32,9 +33,29 @@ settings = {
     "ratio": Decimal('10')  # 1 emoji pro 10 USD
 }
 
-# === TELEGRAM SETUP ===
+# === FLASK SETUP (für Keep-Alive) ===
+app_web = Flask('')
+
+@app_web.route('/')
+def home():
+    return "Bot ist online!"
+
+@app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
+def telegram_webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    asyncio.create_task(application.update_queue.put(update))
+    return 'OK'
+
+def run_web():
+    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
+
+# === TELEGRAM BOT SETUP ===
 bot = Bot(BOT_TOKEN)
-app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # === KOMMANDOS ===
 async def set_gif(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -120,26 +141,29 @@ async def monitor_presale():
 
         prev_balance = new_balance
 
-# === START ===
-async def main():
-    # Befehle registrieren
-    app.add_handler(CommandHandler("setgif", set_gif))
-    app.add_handler(CommandHandler("setemoji", set_emoji))
-    app.add_handler(CommandHandler("setratio", set_ratio))
-    app.add_handler(CommandHandler("uptime", uptime))
+# === MAIN ===
+if __name__ == '__main__':
+    # Keep Flask webserver for keep-alive starten
+    keep_alive()
 
-    # Buy-Tracker starten
-    asyncio.create_task(monitor_presale())
+    # ApplicationBuilder für Telegram Bot
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Webhook starten (nutzt Render-Service-URL)
-    WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
+    # Commands registrieren
+    application.add_handler(CommandHandler("setgif", set_gif))
+    application.add_handler(CommandHandler("setemoji", set_emoji))
+    application.add_handler(CommandHandler("setratio", set_ratio))
+    application.add_handler(CommandHandler("uptime", uptime))
 
-    await app.run_webhook(
+    # Presale Monitoring Task starten
+    application.job_queue.run_repeating(lambda _: asyncio.create_task(monitor_presale()), interval=10, first=1)
+
+    # Webhook URL (anpassen, auf deine Render-URL)
+    WEBHOOK_URL = https://buyalert-bot-pinksale.onrender.com/7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew 
+
+    # Bot starten und Webhook setzen
+    asyncio.run(application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
-        webhook_url=WEBHOOK_URL
-    )
-
-if __name__ == '__main__':
-    nest_asyncio.apply()
-    asyncio.run(main())
+        webhook_url=WEBHOOK_URL,
+    ))
