@@ -142,14 +142,13 @@ async def main():
         await application.process_update(update)
         return web.Response()
 
-    # Root-Route für UptimeRobot & Browser
-async def handle_root(request):
-    return web.Response(text="✅ BuyAlert Bot läuft!")
-  
+    async def handle_root(request):
+        return web.Response(text="✅ BuyAlert Bot läuft!")
+
     app = web.Application()
     app.router.add_post(f'/{BOT_TOKEN}', handle)
-    app.router.add_get("/", handle_root)
-    
+    app.router.add_get('/', handle_root)
+
     port = int(os.environ.get("PORT", 8080))
     print(f"✅ Webhook läuft auf Port {port}")
     runner = web.AppRunner(app)
