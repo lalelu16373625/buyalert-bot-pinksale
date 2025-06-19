@@ -1,23 +1,23 @@
 import asyncio
 import json
 import requests
-from decimal import Decimal, ROUND_DOWN
-from datetime import datetime
-from threading import Thread
-import os
-
-from flask import Flask, request
-
 from web3 import Web3
-from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from datetime import datetime
+from decimal import Decimal, ROUND_DOWN
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ContextTypes
+)
+import os
 
 # === KONFIGURATION ===
 BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
-CHAT_ID = '-1002317784481' 
+CHAT_ID = '-1002317784481'
 PRESALE_CA = '0xC1D459AD4A5D2A6a9557640b6910941718F4fC59'
 SOFTCAP_ETH = Decimal('8.6')
 HARDCAP_ETH = Decimal('34.4')
+WEBHOOK_BASE_URL = 'https://buyalert-bot-pinksale.onrender.com'
+WEBHOOK_URL = f"{WEBHOOK_BASE_URL}/{BOT_TOKEN}"
 
 # === WEB3 SETUP ===
 w3 = Web3(Web3.HTTPProvider('https://mainnet.base.org'))
@@ -32,30 +32,6 @@ settings = {
     "emoji": "💸",
     "ratio": Decimal('10')  # 1 emoji pro 10 USD
 }
-
-# === FLASK SETUP (für Keep-Alive) ===
-app_web = Flask('')
-
-@app_web.route('/')
-def home():
-    return "Bot ist online!"
-
-@app_web.route(f'/{BOT_TOKEN}', methods=['POST'])
-def telegram_webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    asyncio.create_task(application.update_queue.put(update))
-    return 'OK'
-
-def run_web():
-    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
-
-def keep_alive():
-    t = Thread(target=run_web)
-    t.daemon = True
-    t.start()
-
-# === TELEGRAM BOT SETUP ===
-bot = Bot(BOT_TOKEN)
 
 # === KOMMANDOS ===
 async def set_gif(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -90,7 +66,7 @@ async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_eth_price():
     try:
         res = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd')
-        return Decimal(res.json()['ethereum']['usd'])
+        return Decimal(str(res.json()['ethereum']['usd']))
     except:
         return Decimal('3500')
 
@@ -111,19 +87,19 @@ def format_message(to_addr, value_eth, usd, total_eth, total_usd):
         f"🎯 <b>Progress:</b> {percent}%"
     )
 
-async def send_alert(to_addr, value_eth, usd):
+async def send_alert(application, to_addr, value_eth, usd):
     global total_eth, total_usd
     total_eth += value_eth
     total_usd += usd
     msg = format_message(to_addr, value_eth, usd, total_eth, total_usd)
 
     if settings['gif_url']:
-        await bot.send_animation(chat_id=CHAT_ID, animation=settings['gif_url'], caption=msg, parse_mode='HTML')
+        await application.bot.send_animation(chat_id=CHAT_ID, animation=settings['gif_url'], caption=msg, parse_mode='HTML')
     else:
-        await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
+        await application.bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
 
 # === PRESALE MONITOR ===
-async def monitor_presale():
+async def monitor_presale(application):
     print("🔍 Monitoring ETH balance for Buy Events...")
     prev_balance = w3.eth.get_balance(Web3.to_checksum_address(PRESALE_CA))
     eth_price = get_eth_price()
@@ -137,33 +113,30 @@ async def monitor_presale():
             value_eth = Decimal(w3.from_wei(diff_wei, 'ether'))
             usd = value_eth * eth_price
             buyer = "Unknown"
-            await send_alert(buyer, value_eth, usd)
+            await send_alert(application, buyer, value_eth, usd)
 
         prev_balance = new_balance
 
 # === MAIN ===
-if __name__ == '__main__':
-    # Keep Flask webserver for keep-alive starten
-    keep_alive()
-
-    # ApplicationBuilder für Telegram Bot
+async def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Commands registrieren
+    # Telegram Commands registrieren
     application.add_handler(CommandHandler("setgif", set_gif))
     application.add_handler(CommandHandler("setemoji", set_emoji))
     application.add_handler(CommandHandler("setratio", set_ratio))
     application.add_handler(CommandHandler("uptime", uptime))
 
-    # Presale Monitoring Task starten
-    application.job_queue.run_repeating(lambda _: asyncio.create_task(monitor_presale()), interval=10, first=1)
+    # Presale Monitor Task starten
+    asyncio.create_task(monitor_presale(application))
 
-    # Webhook URL (anpassen, auf deine Render-URL)
-    WEBHOOK_URL = 'https://buyalert-bot-pinksale.onrender.com/7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew' 
-
-    # Bot starten und Webhook setzen
-    asyncio.run(application.run_webhook(
+    # Webhook starten
+    await application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
         webhook_url=WEBHOOK_URL,
-    ))
+        drop_pending_updates=True,
+    )
+
+if __name__ == '__main__':
+    asyncio.run(main())
