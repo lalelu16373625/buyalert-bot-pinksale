@@ -1,23 +1,19 @@
-import nest_asyncio
 import asyncio
-import json
-import requests
-from web3 import Web3
+import nest_asyncio
+import os
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
-from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from flask import Flask
-from threading import Thread
-import os
-import logging
 
-# === LOGGING AKTIVIEREN ===
-logging.basicConfig(level=logging.INFO)
+import requests
+from telegram import Update, Bot
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ContextTypes
+)
+from web3 import Web3
 
 # === KONFIGURATION ===
-BOT_TOKEN = '7629429090:AAFWBHI-wXSweLENb0J-Iii1S_14Q-C1xew'
-CHAT_ID = '-1002317784481'
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHAT_ID = os.environ["CHAT_ID"]
 PRESALE_CA = '0xC1D459AD4A5D2A6a9557640b6910941718F4fC59'
 SOFTCAP_ETH = Decimal('8.6')
 HARDCAP_ETH = Decimal('34.4')
@@ -124,42 +120,20 @@ async def monitor_presale():
 
         prev_balance = new_balance
 
-# === FLASK SETUP (nur für Ping/Status) ===
-app_web = Flask('')
-
-@app_web.route('/')
-def home():
-    return "Bot ist online!"
-
-def run_web():
-    app_web.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
-
-def keep_alive():
-    t = Thread(target=run_web)
-    t.daemon = True
-    t.start()
-
-# === BOT STARTEN ===
+# === START ===
 async def main():
-    keep_alive()
-
-    # Telegram Commands registrieren
+    # Befehle registrieren
     app.add_handler(CommandHandler("setgif", set_gif))
     app.add_handler(CommandHandler("setemoji", set_emoji))
     app.add_handler(CommandHandler("setratio", set_ratio))
     app.add_handler(CommandHandler("uptime", uptime))
 
-    # Presale Monitor starten
+    # Buy-Tracker starten
     asyncio.create_task(monitor_presale())
 
-    # Webhook aktivieren
+    # Webhook starten (nutzt Render-Service-URL)
     WEBHOOK_URL = f"https://buyalert-bot-pinksale.onrender.com/{BOT_TOKEN}"
-    await app.bot.delete_webhook(drop_pending_updates=True)
-    await app.bot.set_webhook(url=WEBHOOK_URL)
 
-    print("✅ Bot läuft über Webhook.")
-
-    # Telegram Webhook Server starten
     await app.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8080)),
