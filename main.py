@@ -23,6 +23,7 @@ w3 = Web3(Web3.HTTPProvider('https://mainnet.base.org'))
 # === STATUS ===
 total_eth = Decimal('0')
 total_usd = Decimal('0')
+initial_balance_eth = Decimal('0')  # Startwert des Contracts vor Bot-Start
 
 # === EINSTELLUNGEN ===
 settings = {
@@ -73,7 +74,20 @@ def create_emoji_bar(amount_usd: Decimal):
     return settings['emoji'] * count
 
 def format_message(to_addr, value_eth, usd, total_eth, total_usd):
-    percent = (total_eth / HARDCAP_ETH * 100).quantize(Decimal('0.01'))
+    def progress_bar(percent, length=10):
+        filled = int((percent / 100) * length)
+        empty = length - filled
+        return '▰' * filled + '▱' * empty
+
+    softcap_percent = min((total_eth / SOFTCAP_ETH * 100).quantize(Decimal('0.1')), Decimal('100'))
+    hardcap_percent = min((total_eth / HARDCAP_ETH * 100).quantize(Decimal('0.1')), Decimal('100'))
+
+    softcap_status = "✅" if softcap_percent >= 100 else "❌"
+    hardcap_status = "✅" if hardcap_percent >= 100 else "❌"
+
+    softcap_bar = progress_bar(softcap_percent)
+    hardcap_bar = progress_bar(hardcap_percent)
+
     timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
     emoji_bar = create_emoji_bar(usd)
 
@@ -81,8 +95,9 @@ def format_message(to_addr, value_eth, usd, total_eth, total_usd):
         f"🚀 <b>New Presale Buy!</b>\n"
         f"💰 <b>Amount:</b> {value_eth:.4f} ETH (${usd:.2f}) {emoji_bar}\n"
         f"🕒 <b>Time:</b> {timestamp}\n\n"
-        f"📊 <b>Total Raised:</b> {total_eth:.4f} ETH (${total_usd:.2f})\n"
-        f"🎯 <b>Progress:</b> {percent}%\n"
+        f"📊 <b>Total Raised:</b> {total_eth:.4f} ETH (${total_usd:.2f})\n\n"
+        f"📈 <b>Softcap:</b> {softcap_bar} {softcap_percent}% {softcap_status}\n"
+        f"🎯 <b>Hardcap:</b> {hardcap_bar} {hardcap_percent}% {hardcap_status}\n"
         f"🔗 <b>Contract:</b> <a href='https://base.blockscan.com/address/{PRESALE_CA}'>Link</a>"
     )
 
@@ -99,21 +114,29 @@ async def send_alert(application, to_addr, value_eth, usd):
 
 # === PRESALE MONITOR ===
 async def monitor_presale(application):
+    global total_eth, total_usd, initial_balance_eth
+
     print("🔍 Monitoring ETH balance for Buy Events...")
-    prev_balance = w3.eth.get_balance(Web3.to_checksum_address(PRESALE_CA))
+    prev_balance_wei = w3.eth.get_balance(Web3.to_checksum_address(PRESALE_CA))
+    prev_balance_eth = Decimal(w3.from_wei(prev_balance_wei, 'ether'))
+    initial_balance_eth = prev_balance_eth  # Startwert speichern
+    eth_price = get_eth_price()
+    total_eth = initial_balance_eth
+    total_usd = total_eth * eth_price
 
     while True:
         await asyncio.sleep(5)
         try:
-            new_balance = w3.eth.get_balance(Web3.to_checksum_address(PRESALE_CA))
-            if new_balance > prev_balance:
-                diff_wei = new_balance - prev_balance
-                value_eth = Decimal(w3.from_wei(diff_wei, 'ether'))
-                eth_price = get_eth_price()
-                usd = value_eth * eth_price
-                buyer = "Unknown"  # Erweiterbar: Wallet-Adressen später erfassen
-                await send_alert(application, buyer, value_eth, usd)
-            prev_balance = new_balance
+            new_balance_wei = w3.eth.get_balance(Web3.to_checksum_address(PRESALE_CA))
+            new_balance_eth = Decimal(w3.from_wei(new_balance_wei, 'ether'))
+
+            if new_balance_eth > prev_balance_eth:
+                diff_eth = new_balance_eth - prev_balance_eth
+                usd = diff_eth * get_eth_price()
+                buyer = "Unknown"
+                await send_alert(application, buyer, diff_eth, usd)
+
+            prev_balance_eth = new_balance_eth
         except Exception as e:
             print(f"Fehler beim Monitoring: {e}")
 
